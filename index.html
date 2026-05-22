@@ -317,7 +317,8 @@ function makePill(p) {
   var sc = (TD[p.id]||[]).length;
   var badge = sc>0 ? ' <span class="sbadge">story: '+sc+'</span>' : '';
   var enc = encodeURIComponent(JSON.stringify(p));
-  return '<span class="'+pillCls(p.role)+'" onclick="openDrawer(''+enc+'')" title="Click to view details and add a story">'+esc(p.name)+star+yr+dy+'</span>'+badge;
+  var safe = enc.replace(/'/g, '%27');
+  return '<span class="'+pillCls(p.role)+'" onclick="openDrawer(this)" data-p="'+safe+'" title="Click to view details and add a story">'+esc(p.name)+star+yr+dy+'</span>'+badge;
 }
 
 // FAMILY DATA
@@ -368,7 +369,7 @@ function renderTree(filter) {
           if(ch.note) body+='<span class="knote">'+esc(ch.note)+'</span>';
           body+='</div>';
         });
-        body+='<button class="addbtn" onclick="openAddChild(''+m.id+'',''+g.id+'')">+ add child to this family</button>';
+        body+='<button class="addbtn" data-mid="'+m.id+'" data-gid="'+g.id+'" onclick="openAddChildBtn(this)">+ add child to this family</button>';
         body+='</div>';
       });
       body+='</div>';
@@ -376,7 +377,7 @@ function renderTree(filter) {
     if(!filter||match) {
       var isOpen = GO[g.id] || g.num===11;
       html+='<div class="gen" id="'+g.id+'">'+
-        '<div class="ghdr" style="background:'+g.color+'" onclick="toggleGen(''+g.id+'')">'+
+        '<div class="ghdr" style="background:'+g.color+'" data-gid="'+g.id+'" onclick="toggleGenBtn(this)">'+
         '<span class="garrow'+(isOpen?' open':'')+'" id="arr-'+g.id+'">&#9654;</span>'+
         '<span class="gnum">Gen '+g.num+'</span>'+
         '<span class="gtitle">'+esc(g.name)+'</span>'+
@@ -390,6 +391,10 @@ function renderTree(filter) {
   renderStats();
 }
 
+function toggleGenBtn(el) {
+  var id = el.getAttribute('data-gid');
+  toggleGen(id);
+}
 function toggleGen(id) {
   var body=document.getElementById('body-'+id);
   var arr=document.getElementById('arr-'+id);
@@ -425,7 +430,8 @@ function doSearch(val) { renderTree(val); }
 
 // DRAWER
 var curId=null;
-function openDrawer(enc) {
+function openDrawer(el) {
+  var enc = el.getAttribute ? el.getAttribute('data-p') : el;
   var p;try{p=JSON.parse(decodeURIComponent(enc));}catch(e){return;}
   curId=p.id;
   document.getElementById('drPill').innerHTML='<span class="'+pillCls(p.role)+'" style="font-size:15px;padding:5px 12px">'+esc(p.name)+(p.role==='dir'?' *':'')+'</span>';
@@ -499,6 +505,11 @@ function showTab(name) {
 var addCtx=null;
 var chosenRole=null;
 function openAddModal(){addCtx=null;document.getElementById('modalTitle').textContent='Add a Family Member';clearForm();document.getElementById('modalOverlay').classList.add('open');}
+function openAddChildBtn(el) {
+  var marId = el.getAttribute('data-mid');
+  var gid = el.getAttribute('data-gid');
+  openAddChild(marId, gid);
+}
 function openAddChild(marId,genId){
   addCtx={marId:marId,genId:genId};
   document.getElementById('modalTitle').textContent='Add Child to This Family';
