@@ -721,7 +721,7 @@ function saveData() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(DATA)); } catch(e) {}
 }
 
-var DATA = null;
+var DATA = loadData();
 
 // ============================================================
 // HELPERS
@@ -1121,7 +1121,17 @@ function startApp() {
   DATA = loadData();
   renderTree();
   renderStories();
+  renderStats();
 }
+// Auto-initialize tree on page load
+(function() {
+  try {
+    renderTree();
+    renderStats();
+  } catch(e) {
+    console.log('Init error: ' + e.message);
+  }
+})();
 </script>
 </body>
 </html>
