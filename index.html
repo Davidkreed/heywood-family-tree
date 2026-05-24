@@ -70,6 +70,8 @@ body { font-family: Arial, sans-serif; background: #f5f5f0; color: #1c1a17; }
 .addbtn:hover { background: #f0f0f0; color: #333; border-color: #666; }
 .addbtn.sp-btn { border-color: #3b6d11; color: #3b6d11; }
 .addbtn.sp-btn:hover { background: #eaf3de; }
+.addbtn.fambtn { border-color: #185fa5; color: #185fa5; font-size: 11px; padding: 2px 7px; }
+.addbtn.fambtn:hover { background: #e6f1fb; }
 .overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.45); z-index: 500; display: none; align-items: flex-end; justify-content: center; }
 .overlay.open { display: flex; }
 .drawer { background: white; border-radius: 16px 16px 0 0; width: 100%; max-width: 640px; max-height: 85vh; overflow-y: auto; padding: 18px 18px 30px; }
@@ -332,14 +334,19 @@ function renderStats() {
 }
 
 // TREE
-function makePill(p) {
+function makePill(p, showFamilyBtn) {
   var yr=(p.born&&p.born!=='?')?' <span class="pyr">b.'+esc(p.born)+'</span>':'';
   var dy=(p.died&&p.died!=='?')?' <span class="pyr">d.'+esc(p.died)+'</span>':'';
   var star=(p.role==='dir')?' &#9733;':'';
   var sc=(TD[p.id]||[]).length;
   var badge=sc>0?' <span class="sbadge">story:'+sc+'</span>':'';
   var enc=btoa(unescape(encodeURIComponent(JSON.stringify(p))));
-  return '<span class="'+pillCls(p.role)+'" data-enc="'+enc+'">'+esc(p.name)+star+yr+dy+'</span>'+badge;
+  var pill='<span class="'+pillCls(p.role)+'" data-enc="'+enc+'">'+esc(p.name)+star+yr+dy+'</span>'+badge;
+  if(showFamilyBtn) {
+    var fenc=btoa(unescape(encodeURIComponent(JSON.stringify(p))));
+    pill+=' <button class="addbtn fambtn" data-action="startfamily" data-penc="'+fenc+'" title="Add spouse and children for '+esc(p.name)+'">+ family</button>';
+  }
+  return pill;
 }
 
 function renderTree(filter) {
@@ -365,7 +372,7 @@ function renderTree(filter) {
         body+='<div class="kids">';
         (m.children||[]).forEach(function(c) {
           if(filter&&c.name.toLowerCase().indexOf(filter)>=0) match=true;
-          body+='<div class="krow"><span class="knum">'+(c.num||'')+'. </span>'+makePill(c);
+          body+='<div class="krow"><span class="knum">'+(c.num||'')+'. </span>'+makePill(c, true);
           if(c.note) body+='<span class="knote">'+esc(c.note)+'</span>';
           body+='</div>';
         });
@@ -408,6 +415,9 @@ document.getElementById('treeroot').addEventListener('click', function(e) {
     var action=btn.dataset.action;
     if(action==='addchild') openAddChild(btn.dataset.mid, btn.dataset.gid);
     if(action==='addmarriage') openAddMarriage(btn.dataset.pid, btn.dataset.gid, btn.dataset.fid);
+    if(action==='startfamily') {
+      try { var cp=JSON.parse(decodeURIComponent(escape(atob(btn.dataset.penc)))); openStartFamily(cp); } catch(err){}
+    }
     return;
   }
 });
@@ -516,6 +526,50 @@ document.getElementById('addbtn').addEventListener('click', function() {
   openModal('Add a Family Member', {type:'general'}, true, true, '');
 });
 
+function openStartFamily(person) {
+  // Find which generation this person is in by searching children
+  var genNum = 0;
+  var genId = '';
+  GENS.forEach(function(g) {
+    g.families.forEach(function(f) {
+      f.marriages.forEach(function(m) {
+        (m.children||[]).forEach(function(c) {
+          if(c.id===person.id) { genNum=g.num; genId=g.id; }
+        });
+      });
+    });
+  });
+  // Check if this person already has their own family
+  var existingFam = null;
+  GENS.forEach(function(g) {
+    g.families.forEach(function(f) {
+      if(f.primary.id===person.id) existingFam=f;
+    });
+  });
+  if(existingFam) {
+    // Already has a family - open add marriage on it
+    var g2 = null;
+    GENS.forEach(function(g) { g.families.forEach(function(f) { if(f.id===existingFam.id) g2=g; }); });
+    if(g2) openAddMarriage(person.id, g2.id, existingFam.id);
+    return;
+  }
+  // Create a new family for this person in the SAME generation
+  // (they are a child in gen N, their own family also lives in gen N)
+  var targetGenId = genId;
+  var ctx = {type:'newfamily', person:person, genId:targetGenId};
+  clearForm();
+  addCtx = ctx;
+  document.getElementById('modaltitle').textContent = 'Add Spouse for ' + person.name;
+  document.getElementById('modal-info').textContent = 'This will create a new family entry for ' + person.name + '. Enter their spouse details below.';
+  document.getElementById('modal-info').style.display = 'block';
+  document.getElementById('marriage-fields').style.display = 'block';
+  document.getElementById('gen-field').style.display = 'none';
+  document.getElementById('parents-field').style.display = 'none';
+  // Pre-fill name hint
+  document.getElementById('f_name').placeholder = 'Spouse name e.g. Kelly';
+  document.getElementById('moverlay').classList.add('open');
+}
+
 function openAddChild(marId, genId) {
   var pn='';
   GENS.forEach(function(g){if(g.id===genId){g.families.forEach(function(f){f.marriages.forEach(function(m){if(m.id===marId)pn=f.primary.name+' and '+m.spouse.name;});});}});
@@ -573,6 +627,35 @@ document.getElementById('modalsavebtn').addEventListener('click', function() {
       spouse:{id:uid(),name:name,born:document.getElementById('f_born').value.trim()||'?',bp:document.getElementById('f_bp').value.trim(),died:document.getElementById('f_died').value.trim(),dp:document.getElementById('f_dp').value.trim(),role:'sp'},children:[]};
     GENS.forEach(function(g){if(g.id===ctx.genId){g.families.forEach(function(f){if(f.id===ctx.famId){var n=f.marriages.length+1;nm.label=n===2?'2nd spouse':n===3?'3rd spouse':n+'th spouse';f.marriages.push(nm);}});}});
     toast('New marriage added!');
+
+  } else if(ctx.type==='newfamily') {
+    // Create a brand new family entry for ctx.person with the new spouse
+    var newFam = {
+      id: uid(),
+      primary: ctx.person,
+      marriages: [{
+        id: uid(),
+        label: 'wife/husband',
+        married: document.getElementById('f_married').value.trim(),
+        mplace: document.getElementById('f_mplace').value.trim(),
+        divorced: document.getElementById('f_divorced').value.trim(),
+        spouse: {
+          id: uid(),
+          name: name,
+          born: document.getElementById('f_born').value.trim()||'?',
+          bp: document.getElementById('f_bp').value.trim(),
+          died: document.getElementById('f_died').value.trim(),
+          dp: document.getElementById('f_dp').value.trim(),
+          role: 'sp'
+        },
+        children: []
+      }]
+    };
+    // Add to the same generation
+    GENS.forEach(function(g) {
+      if(g.id===ctx.genId) { g.families.push(newFam); }
+    });
+    toast('Family created for ' + ctx.person.name + '!');
 
   } else {
     var person={id:uid(),name:name,born:document.getElementById('f_born').value.trim()||'?',bp:document.getElementById('f_bp').value.trim(),died:document.getElementById('f_died').value.trim(),dp:document.getElementById('f_dp').value.trim(),role:chosenRole,note:document.getElementById('f_notes').value.trim()};
