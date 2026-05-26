@@ -131,11 +131,7 @@ body { font-family: Arial, sans-serif; background: #f5f5f0; color: #1c1a17; }
 .crow { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
 .csw { width: 60px; height: 22px; border-radius: 4px; flex-shrink: 0; }
 .cdesc { font-size: 13px; color: #666; }
-.setup-box { background: #fff9c4; border: 1px solid #b8a800; border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
-.setup-box h4 { font-size: 14px; color: #5f5500; margin-bottom: 8px; }
-.setup-box p { font-size: 13px; color: #5f5500; margin-bottom: 8px; line-height: 1.5; }
-.setup-box input { width: 100%; padding: 8px 10px; border: 1px solid #b8a800; border-radius: 6px; font-size: 13px; font-family: Arial, sans-serif; margin-bottom: 6px; }
-.setup-box button { padding: 7px 14px; border-radius: 6px; border: none; background: #b8860b; color: white; font-size: 13px; cursor: pointer; font-family: Arial, sans-serif; font-weight: bold; }
+
 @media(max-width:500px) { .stats { grid-template-columns: repeat(2,1fr); } .fg2 { grid-template-columns: 1fr; } }
 </style>
 </head>
@@ -176,7 +172,7 @@ body { font-family: Arial, sans-serif; background: #f5f5f0; color: #1c1a17; }
   </div>
   <div class="content">
     <div class="pane on" id="pane-tree">
-      <div id="firebase-setup-box"></div>
+      
       <div class="stats" id="statsrow"></div>
       <div class="legend">
         <strong>Color guide:</strong>
@@ -423,42 +419,19 @@ function applyAddition(add) {
 
 // Show setup box if no Firebase config
 function showSetupBox() {
-  var saved = null;
-  try { saved = JSON.parse(localStorage.getItem('fbconfig')); } catch(e) {}
-  if (saved && saved.databaseURL) {
-    initFirebase(saved);
-    return;
-  }
-  document.getElementById('firebase-setup-box').innerHTML =
-    '<div class="setup-box">' +
-    '<h4>Connect to Shared Database</h4>' +
-    '<p>To share this tree with family members so everyone sees the same data, enter your Firebase Database URL below. See the Help tab for setup instructions.</p>' +
-    '<input type="text" id="fb-url-input" placeholder="https://your-project-default-rtdb.firebaseio.com"/>' +
-    '<button onclick="connectFirebase()">Connect</button>' +
-    '<p style="margin-top:8px;font-size:12px;color:#888">Without connecting, changes are saved on this device only.</p>' +
-    '</div>';
-  // Fall back to localStorage
-  try {
-    var local = JSON.parse(localStorage.getItem('hr_local') || '{}');
-    TD = local.TD || {};
-    GO = local.GO || {};
-    if (local.additions) { local.additions.forEach(function(a) { applyAddition(a); }); ADDITIONS = local.additions; }
-  } catch(e) {}
-}
-
-function connectFirebase() {
-  var url = document.getElementById('fb-url-input').value.trim();
-  if (!url) { alert('Please enter your Firebase Database URL.'); return; }
+  // Auto-connect with built-in credentials
   initFirebase({
-    apiKey: 'AIzaSyPlaceholder',
-    authDomain: 'placeholder.firebaseapp.com',
-    databaseURL: url,
-    projectId: 'placeholder',
-    storageBucket: 'placeholder.appspot.com',
-    messagingSenderId: '000000000000',
-    appId: '1:000000000000:web:placeholder'
+    apiKey: "AIzaSyCom0ULbQL4vQus-qq-X5JH81ugBPxZgmc",
+    authDomain: "heywood-family-tree.firebaseapp.com",
+    databaseURL: "https://heywood-family-tree-default-rtdb.firebaseio.com",
+    projectId: "heywood-family-tree",
+    storageBucket: "heywood-family-tree.firebasestorage.app",
+    messagingSenderId: "851518107115",
+    appId: "1:851518107115:web:63711d8ec3702424c57dae"
   });
 }
+
+
 
 // ── STATE ─────────────────────────────────────────────────
 var TD = {};
