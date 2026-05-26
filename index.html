@@ -28,6 +28,9 @@ body { font-family: Arial, sans-serif; background: #f5f5f0; color: #1c1a17; }
 .toolbar input { padding: 7px 11px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; width: 200px; }
 .toolbar button { padding: 7px 13px; border: 1px solid #ddd; border-radius: 6px; background: white; cursor: pointer; font-size: 13px; font-family: Arial, sans-serif; }
 .toolbar button.gold { background: #b8860b; color: white; border-color: #b8860b; font-weight: bold; }
+.sync-status { font-size: 11px; color: #888; padding: 2px 8px; border-radius: 20px; background: #f0f0f0; }
+.sync-status.ok { background: #eaf3de; color: #3b6d11; }
+.sync-status.err { background: #fcebeb; color: #a32d2d; }
 .content { max-width: 860px; margin: 0 auto; padding: 16px; }
 .pane { display: none; }
 .pane.on { display: block; }
@@ -128,10 +131,19 @@ body { font-family: Arial, sans-serif; background: #f5f5f0; color: #1c1a17; }
 .crow { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
 .csw { width: 60px; height: 22px; border-radius: 4px; flex-shrink: 0; }
 .cdesc { font-size: 13px; color: #666; }
+.setup-box { background: #fff9c4; border: 1px solid #b8a800; border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
+.setup-box h4 { font-size: 14px; color: #5f5500; margin-bottom: 8px; }
+.setup-box p { font-size: 13px; color: #5f5500; margin-bottom: 8px; line-height: 1.5; }
+.setup-box input { width: 100%; padding: 8px 10px; border: 1px solid #b8a800; border-radius: 6px; font-size: 13px; font-family: Arial, sans-serif; margin-bottom: 6px; }
+.setup-box button { padding: 7px 14px; border-radius: 6px; border: none; background: #b8860b; color: white; font-size: 13px; cursor: pointer; font-family: Arial, sans-serif; font-weight: bold; }
 @media(max-width:500px) { .stats { grid-template-columns: repeat(2,1fr); } .fg2 { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
 <div id="lock">
   <div class="lockbox">
@@ -160,9 +172,11 @@ body { font-family: Arial, sans-serif; background: #f5f5f0; color: #1c1a17; }
     <button class="gold" id="addbtn">+ Add Person</button>
     <button id="expandbtn">Expand All</button>
     <button id="collapsebtn">Collapse All</button>
+    <span class="sync-status" id="syncStatus">Not connected</span>
   </div>
   <div class="content">
     <div class="pane on" id="pane-tree">
+      <div id="firebase-setup-box"></div>
       <div class="stats" id="statsrow"></div>
       <div class="legend">
         <strong>Color guide:</strong>
@@ -183,9 +197,9 @@ body { font-family: Arial, sans-serif; background: #f5f5f0; color: #1c1a17; }
       <div class="hcard"><h3>Getting Started</h3>
         <div class="hstep"><div class="hnum">1</div><div class="htxt"><strong>Browse the tree</strong> - click any colored header bar to expand that generation.</div></div>
         <div class="hstep"><div class="hnum">2</div><div class="htxt"><strong>Click any person</strong> (colored oval) to see their full details and add a story.</div></div>
-        <div class="hstep"><div class="hnum">3</div><div class="htxt"><strong>Add a child</strong> - click the dashed button under any couple to add a child to that family.</div></div>
-        <div class="hstep"><div class="hnum">4</div><div class="htxt"><strong>Add a spouse or new marriage</strong> - click the green button under any person to add a new spouse or second marriage.</div></div>
-        <div class="hstep"><div class="hnum">5</div><div class="htxt"><strong>Add any person</strong> - use the gold button at the top for anyone not yet in the tree.</div></div>
+        <div class="hstep"><div class="hnum">3</div><div class="htxt"><strong>Add a child</strong> - click the dashed button under any couple to add a child.</div></div>
+        <div class="hstep"><div class="hnum">4</div><div class="htxt"><strong>Add a spouse or marriage</strong> - click the green button under any person.</div></div>
+        <div class="hstep"><div class="hnum">5</div><div class="htxt"><strong>Start a family for a child</strong> - click the small blue + family button next to any child to add their spouse and children.</div></div>
         <div class="hstep"><div class="hnum">6</div><div class="htxt"><strong>Search</strong> - type any name to find them instantly across all generations.</div></div>
       </div>
       <div class="hcard"><h3>Color Guide</h3>
@@ -194,6 +208,10 @@ body { font-family: Arial, sans-serif; background: #f5f5f0; color: #1c1a17; }
         <div class="crow"><div class="csw" style="background:#fbeaf0;border:1.5px solid #993556"></div><div class="cdesc"><strong>Pink</strong> - Female family member</div></div>
         <div class="crow"><div class="csw" style="background:#eaf3de;border:1.5px solid #3b6d11"></div><div class="cdesc"><strong>Green</strong> - Married into the family</div></div>
         <div class="crow"><div class="csw" style="background:#f0f0f0;border:1.5px solid #ccc"></div><div class="cdesc"><strong>Gray strikethrough</strong> - Died young or in infancy</div></div>
+      </div>
+      <div class="hcard"><h3>About Shared Saving</h3>
+        <div class="hstep"><div class="hnum" style="background:#3b6d11">i</div><div class="htxt">This tree uses Firebase to save all additions to a shared database. Everyone in the family sees the same data in real time.</div></div>
+        <div class="hstep"><div class="hnum" style="background:#3b6d11">i</div><div class="htxt">The original family data is built in and always available. Only additions and stories are stored in Firebase.</div></div>
       </div>
     </div>
   </div>
@@ -220,7 +238,7 @@ body { font-family: Arial, sans-serif; background: #f5f5f0; color: #1c1a17; }
   <div class="modal">
     <h2 id="modaltitle">Add a Family Member</h2>
     <div class="info-box" id="modal-info" style="display:none"></div>
-    <div class="fg"><label>Full Name *</label><input type="text" id="f_name" placeholder="e.g. Melissa Leigh Reed"></div>
+    <div class="fg"><label>Full Name *</label><input type="text" id="f_name" placeholder="e.g. Kelly Johnson"></div>
     <div class="fg2">
       <div class="fg" style="margin:0"><label>Birth Date</label><input type="text" id="f_born" placeholder="e.g. Oct 10, 1976"></div>
       <div class="fg" style="margin:0"><label>Birthplace</label><input type="text" id="f_bp" placeholder="e.g. San Diego, CA"></div>
@@ -279,12 +297,175 @@ body { font-family: Arial, sans-serif; background: #f5f5f0; color: #1c1a17; }
 <div class="toast" id="toast"></div>
 
 <script>
-var GENS = JSON.parse('[{"id": "g1", "num": 1, "name": "John Heywood", "dates": "~1620-1701", "color": "#1A3A5C", "families": [{"id": "f1a", "primary": {"id": "p_john1", "name": "John Heywood", "born": "~1620", "bp": "London, England", "died": "Jan 11, 1701", "dp": "Concord, MA", "role": "dir", "note": "Came to New England on ship Planter in 1636. Tailor by trade. Admitted freeman 1670."}, "marriages": [{"id": "m1a", "label": "1st wife", "married": "Aug 17, 1656", "spouse": {"id": "sp_rebatk", "name": "Rebecca Atkinson", "born": "~1639", "died": "1665", "role": "sp"}, "children": [{"id": "c1a1", "num": 1, "name": "Rebecca", "born": "Sep 9, 1657", "died": "Sep 27, 1657", "role": "dy"}, {"id": "c1a2", "num": 2, "name": "Rebecca", "born": "May 13, 1660", "role": "f"}, {"id": "c1a3", "num": 3, "name": "John", "born": "Apr 5, 1662", "role": "dir"}, {"id": "c1a4", "num": 4, "name": "Persis", "born": "Apr 11, 1664", "role": "f"}, {"id": "c1a5", "num": 5, "name": "Benoni", "born": "Jul 21, 1665", "died": "Aug 12, 1665", "role": "dy"}]}, {"id": "m1b", "label": "2nd wife", "married": "Aug 5, 1665", "spouse": {"id": "sp_sarasim", "name": "Sarah Simonds", "born": "?", "died": "Sep 19, 1692", "role": "sp"}, "children": [{"id": "c1b1", "num": 6, "name": "Sarah", "born": "Aug 30, 1666", "role": "f"}, {"id": "c1b2", "num": 7, "name": "Judith", "born": "Jan 3, 1667", "role": "f"}, {"id": "c1b3", "num": 8, "name": "Mary", "born": "Nov 3, 1669", "role": "f"}, {"id": "c1b4", "num": 9, "name": "Abigail", "born": "Apr 9, 1672", "role": "f"}, {"id": "c1b5", "num": 10, "name": "William", "born": "Apr 17, 1674", "role": "m"}, {"id": "c1b6", "num": 11, "name": "Huldah", "born": "Sep 17, 1675", "role": "f"}, {"id": "c1b7", "num": 12, "name": "James", "born": "Jan 27, 1678", "role": "m"}, {"id": "c1b8", "num": 13, "name": "Joseph", "born": "Jan 3, 1680", "role": "m"}, {"id": "c1b9", "num": 14, "name": "Benjamin", "born": "Mar 17, 1682", "role": "m"}]}, {"id": "m1c", "label": "3rd wife", "married": "?", "spouse": {"id": "sp_priscilla", "name": "Priscilla ?", "born": "?", "died": "survived him", "role": "sp"}, "children": []}]}]}, {"id": "g2", "num": 2, "name": "Deacon John Heywood", "dates": "1662-1718", "color": "#2C4A6E", "families": [{"id": "f2a", "primary": {"id": "p_djohn", "name": "Deacon John Heywood", "born": "Apr 5, 1662", "bp": "Concord, MA", "died": "Jan 3, 1718", "dp": "Concord, MA", "role": "dir", "note": "Constable of Concord 1676. Deacon. Kept a tavern in later years."}, "marriages": [{"id": "m2a", "label": "wife", "married": "~1687", "spouse": {"id": "sp_sarblod", "name": "Sarah Blodgett", "born": "Feb 17, 1648", "role": "sp"}, "children": [{"id": "c2a1", "num": 1, "name": "Sarah", "born": "?", "role": "f"}, {"id": "c2a2", "num": 2, "name": "Thomas", "born": "Jul 13, 1686", "role": "m"}, {"id": "c2a3", "num": 3, "name": "Samuel", "born": "Oct 11, 1687", "role": "dir"}, {"id": "c2a4", "num": 4, "name": "Edmund", "born": "Jul 31, 1689", "role": "m"}, {"id": "c2a5", "num": 5, "name": "Josiah", "born": "Nov 15, 1691", "role": "m"}, {"id": "c2a6", "num": 6, "name": "Daniel", "born": "Apr 15, 1694", "role": "m", "note": "Removed to Worcester, MA. Married Hannah Ward."}, {"id": "c2a7", "num": 7, "name": "Eleazer", "born": "Aug 3, 1696", "role": "m"}, {"id": "c2a8", "num": 8, "name": "Nathan", "born": "Sep 24, 1698", "role": "m"}, {"id": "c2a9", "num": 9, "name": "Sarah", "born": "Jan 18, 1700", "role": "f"}, {"id": "c2a10", "num": 10, "name": "John", "born": "Mar 14, 1703", "role": "m", "note": "Settled in Lunen"}, {"id": "c2a11", "num": 11, "name": "Mary", "born": "Mar 23, 1704", "role": "f"}, {"id": "c2a12", "num": 12, "name": "Phineas", "born": "Jul 18, 1707", "role": "m", "note": "Lived in Shrewsbury"}, {"id": "c2a13", "num": 13, "name": "Benjamin", "born": "Oct 25, 1709", "role": "m"}]}]}]}, {"id": "g3", "num": 3, "name": "Deacon Samuel Heywood", "dates": "1687-1750", "color": "#1E5C4A", "families": [{"id": "f3a", "primary": {"id": "p_dsam", "name": "Deacon Samuel Heywood", "born": "Oct 11, 1687", "bp": "Concord, MA", "died": "Oct 28, 1750", "dp": "Concord, MA", "role": "dir", "note": "Town clerk. Deacon of First Parish Church of Concord."}, "marriages": [{"id": "m3a", "label": "wife", "married": "~1709", "spouse": {"id": "sp_elizhub", "name": "Elizabeth Hubbard", "born": "1681", "died": "Dec 25, 1757", "role": "sp"}, "children": [{"id": "c3a1", "num": 1, "name": "Samuel", "born": "Oct 18, 1710", "died": "Jan 12, 1712", "role": "dy"}, {"id": "c3a2", "num": 2, "name": "Amos", "born": "Feb 18, 1711", "died": "young", "role": "dy"}, {"id": "c3a3", "num": 3, "name": "Elizabeth", "born": "Jun 3, 1714", "role": "f"}, {"id": "c3a4", "num": 4, "name": "Samuel (Lieut.)", "born": "Mar 4, 1715", "role": "m"}, {"id": "c3a5", "num": 5, "name": "Jonathan", "born": "Dec 3, 1717", "role": "m"}, {"id": "c3a6", "num": 6, "name": "Amos", "born": "Oct 3, 1719", "role": "dir"}, {"id": "c3a7", "num": 7, "name": "Jonas", "born": "Aug 21, 1721", "role": "m"}, {"id": "c3a8", "num": 8, "name": "Charles", "born": "Dec 24, 1723", "role": "m"}, {"id": "c3a9", "num": 9, "name": "Rebecca", "born": "Dec 23, 1775", "role": "f"}, {"id": "c3a10", "num": 10, "name": "Aaron", "born": "Sep 24, 1727", "died": "young", "role": "dy"}, {"id": "c3a11", "num": 11, "name": "Aaron", "born": "Nov 11, 1728", "role": "m"}, {"id": "c3a12", "num": 12, "name": "John", "born": "Jun 22, 1729", "role": "m"}, {"id": "c3a13", "num": 13, "name": "Mary", "born": "Apr 8, 1733", "role": "f"}]}]}]}, {"id": "g4", "num": 4, "name": "Capt. Amos Heywood", "dates": "1719-1792", "color": "#5C3A1E", "families": [{"id": "f4a", "primary": {"id": "p_amos", "name": "Capt. Amos Heywood", "born": "Oct 3, 1719", "bp": "Concord, MA", "died": "Feb 7, 1792", "dp": "Holden, MA", "role": "dir", "note": "Early settler of Holden, MA. Ensign 1763, Captain 1771. Selectman 1762, 1763 and 1780."}, "marriages": [{"id": "m4a", "label": "wife", "married": "~1743", "spouse": {"id": "sp_marybut", "name": "Mary Buttrick", "born": "~1720", "died": "Jan 21, 1793", "role": "sp"}, "children": [{"id": "c4a1", "num": 1, "name": "Daniel", "born": "Jul 2, 1744", "role": "m"}, {"id": "c4a2", "num": 2, "name": "Silas", "born": "Feb 20, 1745", "role": "m"}, {"id": "c4a3", "num": 3, "name": "Amos", "born": "Mar 17, 1748", "role": "m"}, {"id": "c4a4", "num": 4, "name": "Mary", "born": "Apr 9, 1750", "role": "f"}, {"id": "c4a5", "num": 5, "name": "Daniel", "born": "Feb 24, 1752", "role": "m"}, {"id": "c4a6", "num": 6, "name": "Lucy", "born": "Feb 28, 1751", "role": "f"}, {"id": "c4a7", "num": 7, "name": "Eunice", "born": "Jan 1, 1756", "role": "f"}, {"id": "c4a8", "num": 8, "name": "Lucy", "born": "Oct 31, 1757", "role": "dir"}, {"id": "c4a9", "num": 9, "name": "Elizabeth", "born": "Oct 31, 1759", "role": "f"}, {"id": "c4a10", "num": 10, "name": "Levi", "born": "Nov 21, 1761", "role": "m"}, {"id": "c4a11", "num": 11, "name": "Alpheus", "born": "May 21, 1764", "role": "m"}, {"id": "c4a12", "num": 12, "name": "Twin of Alpheus", "born": "~1764", "died": "young", "role": "dy"}]}]}, {"id": "f4b", "label": "Sibling Family - Lieut. Samuel Heywood (brother of Capt. Amos)", "primary": {"id": "p_lieut", "name": "Lieut. Samuel Heywood", "born": "Mar 4, 1715", "bp": "Concord, MA", "died": "~Jul 27, 1792", "role": "m", "note": "Brother of Capt. Amos Heywood."}, "marriages": [{"id": "m4b", "label": "wife", "married": "?", "spouse": {"id": "sp_hepfelt", "name": "Hepzibah Felton", "born": "Bapt. Jan 22, 1722", "role": "sp"}, "children": [{"id": "c4b1", "num": 1, "name": "Elizabeth", "born": "Apr 18, 1746", "died": "young", "role": "dy"}, {"id": "c4b2", "num": 2, "name": "Rebecca", "born": "Oct 21, 1747", "died": "young", "role": "dy"}, {"id": "c4b3", "num": 3, "name": "Elizabeth", "born": "Mar 10, 1748", "role": "f", "note": "Married Willoughby Prescott"}, {"id": "c4b4", "num": 4, "name": "Rebecca", "born": "Oct 21, 1750", "role": "f", "note": "Married Nathan Swan"}, {"id": "c4b5", "num": 5, "name": "Hepzibah", "born": "Jul 25, 1752", "role": "f", "note": "Married Clark Earle"}, {"id": "c4b6", "num": 6, "name": "Hannah", "born": "Apr 23, 1754", "role": "f", "note": "Married James Lamb"}, {"id": "c4b7", "num": 7, "name": "Ruth", "born": "Mar 9, 1756", "role": "f", "note": "Married John Fessenden"}, {"id": "c4b8", "num": 8, "name": "Lucinda", "born": "?", "role": "f", "note": "Married Abel Jones"}, {"id": "c4b9", "num": 9, "name": "Lemuel", "born": "Mar 19, 1762", "died": "Feb 1, 1841", "role": "m", "note": "Capt. Lemuel Heywood - married Lucy Heywood"}, {"id": "c4b10", "num": 10, "name": "Roland", "born": "?", "role": "m"}]}]}]}, {"id": "g5", "num": 5, "name": "Capt. Lemuel and Lucy Heywood", "dates": "1762-1841", "color": "#3A1E5C", "families": [{"id": "f5a", "primary": {"id": "p_lemuel", "name": "Capt. Lemuel Heywood", "born": "Mar 19, 1762", "bp": "Holden, MA", "died": "Feb 1, 1841", "role": "dir", "note": "Revolutionary War soldier, enlisted from Holden Apr 20, 1780."}, "marriages": [{"id": "m5a", "label": "1st wife", "married": "May 2, 1781", "spouse": {"id": "sp_lucyhey", "name": "Lucy Heywood", "born": "Oct 31, 1757", "died": "?", "role": "sp"}, "children": [{"id": "c5a1", "num": 1, "name": "Rufus", "born": "Oct 12, 1782", "role": "m"}, {"id": "c5a2", "num": 2, "name": "Reuben", "born": "Dec 27, 1783", "role": "m"}, {"id": "c5a3", "num": 3, "name": "Luke", "born": "Dec 9, 1785", "role": "m"}, {"id": "c5a4", "num": 4, "name": "George", "born": "Nov 30, 1787", "role": "m"}, {"id": "c5a5", "num": 5, "name": "Rial", "born": "Feb 25, 1790", "role": "dir"}, {"id": "c5a6", "num": 6, "name": "Lucy", "born": "Mar 23, 1792", "role": "f"}, {"id": "c5a7", "num": 7, "name": "Samuel", "born": "Jul 4, 1794", "role": "m"}, {"id": "c5a8", "num": 8, "name": "Hepzibah", "born": "Oct 1, 1796", "role": "f"}, {"id": "c5a9", "num": 9, "name": "Eliza", "born": "May 8, 1700", "role": "f"}]}, {"id": "m5b", "label": "2nd wife", "married": "?", "spouse": {"id": "sp_abipars", "name": "Abigail Parsons", "born": "?", "died": "Sep 26, 1838", "role": "sp"}, "children": [{"id": "c5b1", "num": 10, "name": "Richard P.", "born": "Dec 1, 1801", "died": "Sep 26, 1825", "role": "m"}, {"id": "c5b2", "num": 11, "name": "Nabbe B.", "born": "Feb 28, 1803", "role": "f"}, {"id": "c5b3", "num": 12, "name": "Bushrod Vernon", "born": "Jul 29, 1804", "died": "young", "role": "dy"}, {"id": "c5b4", "num": 13, "name": "Sally R.", "born": "Jan 9, 1806", "role": "f"}, {"id": "c5b5", "num": 14, "name": "Caroline C.", "born": "Nov 6, 1807", "role": "f"}, {"id": "c5b6", "num": 15, "name": "Horaton N.", "born": "Apr 2, 1809", "role": "m"}, {"id": "c5b7", "num": 16, "name": "Adeline B.", "born": "May 5, 1812", "role": "f"}, {"id": "c5b8", "num": 17, "name": "Lemuel A.", "born": "Apr 3, 1814", "role": "m"}]}]}]}, {"id": "g6", "num": 6, "name": "Rial Heywood", "dates": "1790-1856", "color": "#1E4A5C", "families": [{"id": "f6a", "primary": {"id": "p_rial", "name": "Rial Heywood", "born": "Feb 25, 1790", "bp": "Winchendon, MA", "died": "Jan 18, 1856", "dp": "Sterling, MA", "role": "dir", "note": "Farmed 18 acres. Sunstruck about 1855 and became an invalid until his death."}, "marriages": [{"id": "m6a", "label": "wife", "married": "Nov 12, 1814", "spouse": {"id": "sp_betspal", "name": "Betsey Palmer", "born": "?", "died": "Mar 27, 1860", "role": "sp"}, "children": [{"id": "c6a1", "num": 1, "name": "Joseph Palmer", "born": "May 30, 1816", "role": "m"}, {"id": "c6a2", "num": 2, "name": "Sophia Elizabeth", "born": "Mar 28, 1818", "died": "1907", "role": "f"}, {"id": "c6a3", "num": 3, "name": "Emily L.", "born": "May 9, 1820", "role": "f"}, {"id": "c6a4", "num": 4, "name": "Susan P.", "born": "Feb 23, 1823", "role": "f"}, {"id": "c6a5", "num": 5, "name": "Harriet M.", "born": "May 2, 1825", "role": "f"}, {"id": "c6a6", "num": 6, "name": "Moses B.", "born": "May 6, 1827", "role": "m"}, {"id": "c6a7", "num": 7, "name": "John H.", "born": "Sep 27, 1830", "role": "m"}, {"id": "c6a8", "num": 8, "name": "Waldo W.", "born": "Sep 26, 1834", "died": "May 25, 1907", "role": "dir"}, {"id": "c6a9", "num": 9, "name": "Warren", "born": "?", "role": "m"}]}]}]}, {"id": "g7", "num": 7, "name": "Waldo Webster Heywood", "dates": "1834-1907", "color": "#4A2E1E", "families": [{"id": "f7a", "primary": {"id": "p_waldo", "name": "Waldo Webster Heywood", "born": "Sep 26, 1834", "bp": "Sterling, MA", "died": "May 25, 1907", "dp": "Ironton, MO", "role": "dir"}, "marriages": [{"id": "m7a", "label": "1st wife", "married": "May 5, 1861", "note": "Married at Chelsea, MI", "spouse": {"id": "sp_helweb", "name": "Helen Webb", "born": "?", "died": "?", "role": "sp"}, "children": [{"id": "c7a1", "num": 1, "name": "Clarence DeLorme", "born": "~1866", "role": "m"}, {"id": "c7a2", "num": 2, "name": "Alice", "born": "~1870", "role": "f", "note": "Married James Farr"}]}, {"id": "m7b", "label": "2nd wife", "married": "Dec 24, 1885", "note": "Married at Ironton, MO", "spouse": {"id": "sp_amapan", "name": "Amanda Pannebecker", "born": "?", "died": "?", "role": "sp"}, "children": [{"id": "c7b1", "num": 3, "name": "Walter Webster", "born": "Dec 7, 1886", "died": "Apr 19, 1891", "role": "m"}, {"id": "c7b2", "num": 4, "name": "Elsie Maria", "born": "Sep 16, 1889", "died": "Jul 24, 1894", "role": "f"}, {"id": "c7b3", "num": 5, "name": "Oscar Blaine", "born": "Nov 12, 1892", "died": "Apr 3, 1963", "role": "dir"}]}]}]}, {"id": "g8", "num": 8, "name": "Oscar Blaine Heywood", "dates": "1892-1963", "color": "#2C4A1E", "families": [{"id": "f8a", "primary": {"id": "p_oscar", "name": "Oscar Blaine Heywood", "born": "Nov 12, 1892", "died": "Apr 3, 1963", "role": "dir", "note": "Served in U.S. Army Air Corps during WWI in France."}, "marriages": [{"id": "m8a", "label": "wife", "married": "Dec 26, 1919", "spouse": {"id": "sp_perle", "name": "Perle Marie Conway", "born": "?", "died": "?", "role": "sp"}, "children": [{"id": "c8a1", "num": 1, "name": "Shelby", "born": "?", "died": "infancy", "role": "dy"}, {"id": "c8a2", "num": 2, "name": "Norma Lois", "born": "Jan 8, 1923", "died": "Apr 1984", "role": "dir"}, {"id": "c8a3", "num": 3, "name": "Kenneth Warren", "born": "Sep 30, 1925", "role": "m", "note": "US Navy Submarine Service WWII 1943-1946. Co-inventor of 4 US patents. Married Elizabeth Ann Krich Aug 21 1948. Children: Diane Elizabeth b. Nov 16 1953, Deborah Jean b. Aug 19 1956."}, {"id": "c8a4", "num": 4, "name": "Donald Leigh", "born": "Mar 6, 1936", "died": "Jan 27, 1977", "role": "m"}, {"id": "c8a5", "num": 5, "name": "Doris Claire", "born": "Jul 26, 1937", "role": "f"}]}]}]}, {"id": "g9", "num": 9, "name": "Norma Lois Heywood", "dates": "1923-1984", "color": "#5C3A2E", "families": [{"id": "f9a", "primary": {"id": "p_norma", "name": "Norma Lois Heywood", "born": "Jan 8, 1923", "died": "Apr 1984", "role": "dir"}, "marriages": [{"id": "m9a", "label": "1st husband", "married": "?", "spouse": {"id": "sp_miller", "name": "Miller Elmont Steele", "born": "?", "died": "?", "role": "sp"}, "children": [{"id": "c9a1", "num": 1, "name": "Sandi", "born": "?", "role": "f"}, {"id": "c9a2", "num": 2, "name": "Barbara", "born": "?", "role": "f"}, {"id": "c9a3", "num": 3, "name": "Carla Elizabeth", "born": "Sep 26, 1952", "role": "dir"}, {"id": "c9a4", "num": 4, "name": "Pamela", "born": "?", "role": "f"}, {"id": "c9a5", "num": 5, "name": "Richard Heywood Johnson", "born": "?", "role": "m"}]}, {"id": "m9b", "label": "2nd husband", "married": "?", "spouse": {"id": "sp_normjohn", "name": "Norman Johnson", "born": "?", "died": "?", "role": "sp"}, "children": [{"id": "c9b1", "num": 6, "name": "Lori Johnson", "born": "?", "role": "f"}, {"id": "c9b2", "num": 7, "name": "Jeffery Warren Johnson", "born": "?", "role": "m"}]}]}]}, {"id": "g10", "num": 10, "name": "Carla Elizabeth Steele", "dates": "b.1952", "color": "#1E3A5C", "families": [{"id": "f10a", "primary": {"id": "p_carla", "name": "Carla Elizabeth Steele", "born": "Sep 26, 1952", "role": "dir"}, "marriages": [{"id": "m10a", "label": "husband", "married": "Jan 31, 1968", "divorced": "1974", "spouse": {"id": "sp_clay", "name": "Clayton Theodore Reed", "born": "Apr 14, 1944", "role": "sp"}, "children": [{"id": "c10a1", "num": 1, "name": "David Kenneth Reed", "born": "Apr 12, 1969", "role": "dir"}, {"id": "c10a2", "num": 2, "name": "Melissa Leigh Reed", "born": "Oct 10, 1976", "bp": "San Diego, CA", "role": "f"}]}]}]}, {"id": "g11", "num": 11, "name": "David Kenneth Reed", "dates": "b.1969", "color": "#0F2A44", "families": [{"id": "f11a", "primary": {"id": "p_david", "name": "David Kenneth Reed", "born": "Apr 12, 1969", "role": "dir", "note": "11th generation descendant of John Heywood born ~1620 London England."}, "marriages": [{"id": "m11a", "label": "wife", "married": "Jul 9, 2006", "spouse": {"id": "sp_chris", "name": "Christina Rae Helphrey", "born": "Oct 28, 1976", "role": "sp"}, "children": [{"id": "c11a1", "num": 1, "name": "Danica Jeanette Reed", "born": "Sep 3, 2008", "role": "f"}, {"id": "c11a2", "num": 2, "name": "Charlotte Elizabeth Reed", "born": "Dec 12, 2010", "role": "f"}]}]}]}]');
+// ── FAMILY DATA ───────────────────────────────────────────
+var BASE_GENS = JSON.parse('[{"id": "g1", "num": 1, "name": "John Heywood", "dates": "~1620-1701", "color": "#1A3A5C", "families": [{"id": "f1a", "primary": {"id": "p_john1", "name": "John Heywood", "born": "~1620", "bp": "London, England", "died": "Jan 11, 1701", "dp": "Concord, MA", "role": "dir", "note": "Came to New England on ship Planter in 1636. Tailor by trade. Admitted freeman 1670."}, "marriages": [{"id": "m1a", "label": "1st wife", "married": "Aug 17, 1656", "spouse": {"id": "sp_rebatk", "name": "Rebecca Atkinson", "born": "~1639", "died": "1665", "role": "sp"}, "children": [{"id": "c1a1", "num": 1, "name": "Rebecca", "born": "Sep 9, 1657", "died": "Sep 27, 1657", "role": "dy"}, {"id": "c1a2", "num": 2, "name": "Rebecca", "born": "May 13, 1660", "role": "f"}, {"id": "c1a3", "num": 3, "name": "John", "born": "Apr 5, 1662", "role": "dir"}, {"id": "c1a4", "num": 4, "name": "Persis", "born": "Apr 11, 1664", "role": "f"}, {"id": "c1a5", "num": 5, "name": "Benoni", "born": "Jul 21, 1665", "died": "Aug 12, 1665", "role": "dy"}]}, {"id": "m1b", "label": "2nd wife", "married": "Aug 5, 1665", "spouse": {"id": "sp_sarasim", "name": "Sarah Simonds", "born": "?", "died": "Sep 19, 1692", "role": "sp"}, "children": [{"id": "c1b1", "num": 6, "name": "Sarah", "born": "Aug 30, 1666", "role": "f"}, {"id": "c1b2", "num": 7, "name": "Judith", "born": "Jan 3, 1667", "role": "f"}, {"id": "c1b3", "num": 8, "name": "Mary", "born": "Nov 3, 1669", "role": "f"}, {"id": "c1b4", "num": 9, "name": "Abigail", "born": "Apr 9, 1672", "role": "f"}, {"id": "c1b5", "num": 10, "name": "William", "born": "Apr 17, 1674", "role": "m"}, {"id": "c1b6", "num": 11, "name": "Huldah", "born": "Sep 17, 1675", "role": "f"}, {"id": "c1b7", "num": 12, "name": "James", "born": "Jan 27, 1678", "role": "m"}, {"id": "c1b8", "num": 13, "name": "Joseph", "born": "Jan 3, 1680", "role": "m"}, {"id": "c1b9", "num": 14, "name": "Benjamin", "born": "Mar 17, 1682", "role": "m"}]}, {"id": "m1c", "label": "3rd wife", "married": "?", "spouse": {"id": "sp_priscilla", "name": "Priscilla ?", "born": "?", "died": "survived him", "role": "sp"}, "children": []}]}]}, {"id": "g2", "num": 2, "name": "Deacon John Heywood", "dates": "1662-1718", "color": "#2C4A6E", "families": [{"id": "f2a", "primary": {"id": "p_djohn", "name": "Deacon John Heywood", "born": "Apr 5, 1662", "bp": "Concord, MA", "died": "Jan 3, 1718", "dp": "Concord, MA", "role": "dir", "note": "Constable of Concord 1676. Deacon. Kept a tavern in later years."}, "marriages": [{"id": "m2a", "label": "wife", "married": "~1687", "spouse": {"id": "sp_sarblod", "name": "Sarah Blodgett", "born": "Feb 17, 1648", "role": "sp"}, "children": [{"id": "c2a1", "num": 1, "name": "Sarah", "born": "?", "role": "f"}, {"id": "c2a2", "num": 2, "name": "Thomas", "born": "Jul 13, 1686", "role": "m"}, {"id": "c2a3", "num": 3, "name": "Samuel", "born": "Oct 11, 1687", "role": "dir"}, {"id": "c2a4", "num": 4, "name": "Edmund", "born": "Jul 31, 1689", "role": "m"}, {"id": "c2a5", "num": 5, "name": "Josiah", "born": "Nov 15, 1691", "role": "m"}, {"id": "c2a6", "num": 6, "name": "Daniel", "born": "Apr 15, 1694", "role": "m", "note": "Removed to Worcester, MA. Married Hannah Ward."}, {"id": "c2a7", "num": 7, "name": "Eleazer", "born": "Aug 3, 1696", "role": "m"}, {"id": "c2a8", "num": 8, "name": "Nathan", "born": "Sep 24, 1698", "role": "m"}, {"id": "c2a9", "num": 9, "name": "Sarah", "born": "Jan 18, 1700", "role": "f"}, {"id": "c2a10", "num": 10, "name": "John", "born": "Mar 14, 1703", "role": "m", "note": "Settled in Lunen"}, {"id": "c2a11", "num": 11, "name": "Mary", "born": "Mar 23, 1704", "role": "f"}, {"id": "c2a12", "num": 12, "name": "Phineas", "born": "Jul 18, 1707", "role": "m", "note": "Lived in Shrewsbury"}, {"id": "c2a13", "num": 13, "name": "Benjamin", "born": "Oct 25, 1709", "role": "m"}]}]}]}, {"id": "g3", "num": 3, "name": "Deacon Samuel Heywood", "dates": "1687-1750", "color": "#1E5C4A", "families": [{"id": "f3a", "primary": {"id": "p_dsam", "name": "Deacon Samuel Heywood", "born": "Oct 11, 1687", "bp": "Concord, MA", "died": "Oct 28, 1750", "dp": "Concord, MA", "role": "dir", "note": "Town clerk. Deacon of First Parish Church of Concord."}, "marriages": [{"id": "m3a", "label": "wife", "married": "~1709", "spouse": {"id": "sp_elizhub", "name": "Elizabeth Hubbard", "born": "1681", "died": "Dec 25, 1757", "role": "sp"}, "children": [{"id": "c3a1", "num": 1, "name": "Samuel", "born": "Oct 18, 1710", "died": "Jan 12, 1712", "role": "dy"}, {"id": "c3a2", "num": 2, "name": "Amos", "born": "Feb 18, 1711", "died": "young", "role": "dy"}, {"id": "c3a3", "num": 3, "name": "Elizabeth", "born": "Jun 3, 1714", "role": "f"}, {"id": "c3a4", "num": 4, "name": "Samuel (Lieut.)", "born": "Mar 4, 1715", "role": "m"}, {"id": "c3a5", "num": 5, "name": "Jonathan", "born": "Dec 3, 1717", "role": "m"}, {"id": "c3a6", "num": 6, "name": "Amos", "born": "Oct 3, 1719", "role": "dir"}, {"id": "c3a7", "num": 7, "name": "Jonas", "born": "Aug 21, 1721", "role": "m"}, {"id": "c3a8", "num": 8, "name": "Charles", "born": "Dec 24, 1723", "role": "m"}, {"id": "c3a9", "num": 9, "name": "Rebecca", "born": "Dec 23, 1775", "role": "f"}, {"id": "c3a10", "num": 10, "name": "Aaron", "born": "Sep 24, 1727", "died": "young", "role": "dy"}, {"id": "c3a11", "num": 11, "name": "Aaron", "born": "Nov 11, 1728", "role": "m"}, {"id": "c3a12", "num": 12, "name": "John", "born": "Jun 22, 1729", "role": "m"}, {"id": "c3a13", "num": 13, "name": "Mary", "born": "Apr 8, 1733", "role": "f"}]}]}]}, {"id": "g4", "num": 4, "name": "Capt. Amos Heywood", "dates": "1719-1792", "color": "#5C3A1E", "families": [{"id": "f4a", "primary": {"id": "p_amos", "name": "Capt. Amos Heywood", "born": "Oct 3, 1719", "bp": "Concord, MA", "died": "Feb 7, 1792", "dp": "Holden, MA", "role": "dir", "note": "Early settler of Holden, MA. Ensign 1763, Captain 1771. Selectman 1762, 1763 and 1780."}, "marriages": [{"id": "m4a", "label": "wife", "married": "~1743", "spouse": {"id": "sp_marybut", "name": "Mary Buttrick", "born": "~1720", "died": "Jan 21, 1793", "role": "sp"}, "children": [{"id": "c4a1", "num": 1, "name": "Daniel", "born": "Jul 2, 1744", "role": "m"}, {"id": "c4a2", "num": 2, "name": "Silas", "born": "Feb 20, 1745", "role": "m"}, {"id": "c4a3", "num": 3, "name": "Amos", "born": "Mar 17, 1748", "role": "m"}, {"id": "c4a4", "num": 4, "name": "Mary", "born": "Apr 9, 1750", "role": "f"}, {"id": "c4a5", "num": 5, "name": "Daniel", "born": "Feb 24, 1752", "role": "m"}, {"id": "c4a6", "num": 6, "name": "Lucy", "born": "Feb 28, 1751", "role": "f"}, {"id": "c4a7", "num": 7, "name": "Eunice", "born": "Jan 1, 1756", "role": "f"}, {"id": "c4a8", "num": 8, "name": "Lucy", "born": "Oct 31, 1757", "role": "dir"}, {"id": "c4a9", "num": 9, "name": "Elizabeth", "born": "Oct 31, 1759", "role": "f"}, {"id": "c4a10", "num": 10, "name": "Levi", "born": "Nov 21, 1761", "role": "m"}, {"id": "c4a11", "num": 11, "name": "Alpheus", "born": "May 21, 1764", "role": "m"}, {"id": "c4a12", "num": 12, "name": "Twin of Alpheus", "born": "~1764", "died": "young", "role": "dy"}]}]}, {"id": "f4b", "label": "Sibling Family - Lieut. Samuel Heywood (brother of Capt. Amos)", "primary": {"id": "p_lieut", "name": "Lieut. Samuel Heywood", "born": "Mar 4, 1715", "bp": "Concord, MA", "died": "~Jul 27, 1792", "role": "m", "note": "Brother of Capt. Amos Heywood."}, "marriages": [{"id": "m4b", "label": "wife", "married": "?", "spouse": {"id": "sp_hepfelt", "name": "Hepzibah Felton", "born": "Bapt. Jan 22, 1722", "role": "sp"}, "children": [{"id": "c4b1", "num": 1, "name": "Elizabeth", "born": "Apr 18, 1746", "died": "young", "role": "dy"}, {"id": "c4b2", "num": 2, "name": "Rebecca", "born": "Oct 21, 1747", "died": "young", "role": "dy"}, {"id": "c4b3", "num": 3, "name": "Elizabeth", "born": "Mar 10, 1748", "role": "f", "note": "Married Willoughby Prescott"}, {"id": "c4b4", "num": 4, "name": "Rebecca", "born": "Oct 21, 1750", "role": "f", "note": "Married Nathan Swan"}, {"id": "c4b5", "num": 5, "name": "Hepzibah", "born": "Jul 25, 1752", "role": "f", "note": "Married Clark Earle"}, {"id": "c4b6", "num": 6, "name": "Hannah", "born": "Apr 23, 1754", "role": "f", "note": "Married James Lamb"}, {"id": "c4b7", "num": 7, "name": "Ruth", "born": "Mar 9, 1756", "role": "f", "note": "Married John Fessenden"}, {"id": "c4b8", "num": 8, "name": "Lucinda", "born": "?", "role": "f", "note": "Married Abel Jones"}, {"id": "c4b9", "num": 9, "name": "Lemuel", "born": "Mar 19, 1762", "died": "Feb 1, 1841", "role": "m", "note": "Capt. Lemuel Heywood - married Lucy Heywood"}, {"id": "c4b10", "num": 10, "name": "Roland", "born": "?", "role": "m"}]}]}]}, {"id": "g5", "num": 5, "name": "Capt. Lemuel and Lucy Heywood", "dates": "1762-1841", "color": "#3A1E5C", "families": [{"id": "f5a", "primary": {"id": "p_lemuel", "name": "Capt. Lemuel Heywood", "born": "Mar 19, 1762", "bp": "Holden, MA", "died": "Feb 1, 1841", "role": "dir", "note": "Revolutionary War soldier, enlisted from Holden Apr 20, 1780."}, "marriages": [{"id": "m5a", "label": "1st wife", "married": "May 2, 1781", "spouse": {"id": "sp_lucyhey", "name": "Lucy Heywood", "born": "Oct 31, 1757", "died": "?", "role": "sp"}, "children": [{"id": "c5a1", "num": 1, "name": "Rufus", "born": "Oct 12, 1782", "role": "m"}, {"id": "c5a2", "num": 2, "name": "Reuben", "born": "Dec 27, 1783", "role": "m"}, {"id": "c5a3", "num": 3, "name": "Luke", "born": "Dec 9, 1785", "role": "m"}, {"id": "c5a4", "num": 4, "name": "George", "born": "Nov 30, 1787", "role": "m"}, {"id": "c5a5", "num": 5, "name": "Rial", "born": "Feb 25, 1790", "role": "dir"}, {"id": "c5a6", "num": 6, "name": "Lucy", "born": "Mar 23, 1792", "role": "f"}, {"id": "c5a7", "num": 7, "name": "Samuel", "born": "Jul 4, 1794", "role": "m"}, {"id": "c5a8", "num": 8, "name": "Hepzibah", "born": "Oct 1, 1796", "role": "f"}, {"id": "c5a9", "num": 9, "name": "Eliza", "born": "May 8, 1700", "role": "f"}]}, {"id": "m5b", "label": "2nd wife", "married": "?", "spouse": {"id": "sp_abipars", "name": "Abigail Parsons", "born": "?", "died": "Sep 26, 1838", "role": "sp"}, "children": [{"id": "c5b1", "num": 10, "name": "Richard P.", "born": "Dec 1, 1801", "died": "Sep 26, 1825", "role": "m"}, {"id": "c5b2", "num": 11, "name": "Nabbe B.", "born": "Feb 28, 1803", "role": "f"}, {"id": "c5b3", "num": 12, "name": "Bushrod Vernon", "born": "Jul 29, 1804", "died": "young", "role": "dy"}, {"id": "c5b4", "num": 13, "name": "Sally R.", "born": "Jan 9, 1806", "role": "f"}, {"id": "c5b5", "num": 14, "name": "Caroline C.", "born": "Nov 6, 1807", "role": "f"}, {"id": "c5b6", "num": 15, "name": "Horaton N.", "born": "Apr 2, 1809", "role": "m"}, {"id": "c5b7", "num": 16, "name": "Adeline B.", "born": "May 5, 1812", "role": "f"}, {"id": "c5b8", "num": 17, "name": "Lemuel A.", "born": "Apr 3, 1814", "role": "m"}]}]}]}, {"id": "g6", "num": 6, "name": "Rial Heywood", "dates": "1790-1856", "color": "#1E4A5C", "families": [{"id": "f6a", "primary": {"id": "p_rial", "name": "Rial Heywood", "born": "Feb 25, 1790", "bp": "Winchendon, MA", "died": "Jan 18, 1856", "dp": "Sterling, MA", "role": "dir", "note": "Farmed 18 acres. Sunstruck about 1855 and became an invalid until his death."}, "marriages": [{"id": "m6a", "label": "wife", "married": "Nov 12, 1814", "spouse": {"id": "sp_betspal", "name": "Betsey Palmer", "born": "?", "died": "Mar 27, 1860", "role": "sp"}, "children": [{"id": "c6a1", "num": 1, "name": "Joseph Palmer", "born": "May 30, 1816", "role": "m"}, {"id": "c6a2", "num": 2, "name": "Sophia Elizabeth", "born": "Mar 28, 1818", "died": "1907", "role": "f"}, {"id": "c6a3", "num": 3, "name": "Emily L.", "born": "May 9, 1820", "role": "f"}, {"id": "c6a4", "num": 4, "name": "Susan P.", "born": "Feb 23, 1823", "role": "f"}, {"id": "c6a5", "num": 5, "name": "Harriet M.", "born": "May 2, 1825", "role": "f"}, {"id": "c6a6", "num": 6, "name": "Moses B.", "born": "May 6, 1827", "role": "m"}, {"id": "c6a7", "num": 7, "name": "John H.", "born": "Sep 27, 1830", "role": "m"}, {"id": "c6a8", "num": 8, "name": "Waldo W.", "born": "Sep 26, 1834", "died": "May 25, 1907", "role": "dir"}, {"id": "c6a9", "num": 9, "name": "Warren", "born": "?", "role": "m"}]}]}]}, {"id": "g7", "num": 7, "name": "Waldo Webster Heywood", "dates": "1834-1907", "color": "#4A2E1E", "families": [{"id": "f7a", "primary": {"id": "p_waldo", "name": "Waldo Webster Heywood", "born": "Sep 26, 1834", "bp": "Sterling, MA", "died": "May 25, 1907", "dp": "Ironton, MO", "role": "dir"}, "marriages": [{"id": "m7a", "label": "1st wife", "married": "May 5, 1861", "note": "Married at Chelsea, MI", "spouse": {"id": "sp_helweb", "name": "Helen Webb", "born": "?", "died": "?", "role": "sp"}, "children": [{"id": "c7a1", "num": 1, "name": "Clarence DeLorme", "born": "~1866", "role": "m"}, {"id": "c7a2", "num": 2, "name": "Alice", "born": "~1870", "role": "f", "note": "Married James Farr"}]}, {"id": "m7b", "label": "2nd wife", "married": "Dec 24, 1885", "note": "Married at Ironton, MO", "spouse": {"id": "sp_amapan", "name": "Amanda Pannebecker", "born": "?", "died": "?", "role": "sp"}, "children": [{"id": "c7b1", "num": 3, "name": "Walter Webster", "born": "Dec 7, 1886", "died": "Apr 19, 1891", "role": "m"}, {"id": "c7b2", "num": 4, "name": "Elsie Maria", "born": "Sep 16, 1889", "died": "Jul 24, 1894", "role": "f"}, {"id": "c7b3", "num": 5, "name": "Oscar Blaine", "born": "Nov 12, 1892", "died": "Apr 3, 1963", "role": "dir"}]}]}]}, {"id": "g8", "num": 8, "name": "Oscar Blaine Heywood", "dates": "1892-1963", "color": "#2C4A1E", "families": [{"id": "f8a", "primary": {"id": "p_oscar", "name": "Oscar Blaine Heywood", "born": "Nov 12, 1892", "died": "Apr 3, 1963", "role": "dir", "note": "Served in U.S. Army Air Corps during WWI in France."}, "marriages": [{"id": "m8a", "label": "wife", "married": "Dec 26, 1919", "spouse": {"id": "sp_perle", "name": "Perle Marie Conway", "born": "?", "died": "?", "role": "sp"}, "children": [{"id": "c8a1", "num": 1, "name": "Shelby", "born": "?", "died": "infancy", "role": "dy"}, {"id": "c8a2", "num": 2, "name": "Norma Lois", "born": "Jan 8, 1923", "died": "Apr 1984", "role": "dir"}, {"id": "c8a3", "num": 3, "name": "Kenneth Warren", "born": "Sep 30, 1925", "role": "m", "note": "US Navy Submarine Service WWII 1943-1946. Co-inventor of 4 US patents. Married Elizabeth Ann Krich Aug 21 1948. Children: Diane Elizabeth b. Nov 16 1953, Deborah Jean b. Aug 19 1956."}, {"id": "c8a4", "num": 4, "name": "Donald Leigh", "born": "Mar 6, 1936", "died": "Jan 27, 1977", "role": "m"}, {"id": "c8a5", "num": 5, "name": "Doris Claire", "born": "Jul 26, 1937", "role": "f"}]}]}]}, {"id": "g9", "num": 9, "name": "Norma Lois Heywood", "dates": "1923-1984", "color": "#5C3A2E", "families": [{"id": "f9a", "primary": {"id": "p_norma", "name": "Norma Lois Heywood", "born": "Jan 8, 1923", "died": "Apr 1984", "role": "dir"}, "marriages": [{"id": "m9a", "label": "1st husband", "married": "?", "spouse": {"id": "sp_miller", "name": "Miller Elmont Steele", "born": "?", "died": "?", "role": "sp"}, "children": [{"id": "c9a1", "num": 1, "name": "Sandi", "born": "?", "role": "f"}, {"id": "c9a2", "num": 2, "name": "Barbara", "born": "?", "role": "f"}, {"id": "c9a3", "num": 3, "name": "Carla Elizabeth", "born": "Sep 26, 1952", "role": "dir"}, {"id": "c9a4", "num": 4, "name": "Pamela", "born": "?", "role": "f"}, {"id": "c9a5", "num": 5, "name": "Richard Heywood Johnson", "born": "?", "role": "m"}]}, {"id": "m9b", "label": "2nd husband", "married": "?", "spouse": {"id": "sp_normjohn", "name": "Norman Johnson", "born": "?", "died": "?", "role": "sp"}, "children": [{"id": "c9b1", "num": 6, "name": "Lori Johnson", "born": "?", "role": "f"}, {"id": "c9b2", "num": 7, "name": "Jeffery Warren Johnson", "born": "?", "role": "m"}]}]}]}, {"id": "g10", "num": 10, "name": "Carla Elizabeth Steele", "dates": "b.1952", "color": "#1E3A5C", "families": [{"id": "f10a", "primary": {"id": "p_carla", "name": "Carla Elizabeth Steele", "born": "Sep 26, 1952", "role": "dir"}, "marriages": [{"id": "m10a", "label": "husband", "married": "Jan 31, 1968", "divorced": "1974", "spouse": {"id": "sp_clay", "name": "Clayton Theodore Reed", "born": "Apr 14, 1944", "role": "sp"}, "children": [{"id": "c10a1", "num": 1, "name": "David Kenneth Reed", "born": "Apr 12, 1969", "role": "dir"}, {"id": "c10a2", "num": 2, "name": "Melissa Leigh Reed", "born": "Oct 10, 1976", "bp": "San Diego, CA", "role": "f"}]}]}]}, {"id": "g11", "num": 11, "name": "David Kenneth Reed", "dates": "b.1969", "color": "#0F2A44", "families": [{"id": "f11a", "primary": {"id": "p_david", "name": "David Kenneth Reed", "born": "Apr 12, 1969", "role": "dir", "note": "11th generation descendant of John Heywood born ~1620 London England."}, "marriages": [{"id": "m11a", "label": "wife", "married": "Jul 9, 2006", "spouse": {"id": "sp_chris", "name": "Christina Rae Helphrey", "born": "Oct 28, 1976", "role": "sp"}, "children": [{"id": "c11a1", "num": 1, "name": "Danica Jeanette Reed", "born": "Sep 3, 2008", "role": "f"}, {"id": "c11a2", "num": 2, "name": "Charlotte Elizabeth Reed", "born": "Dec 12, 2010", "role": "f"}]}]}]}]');
+
+// ── FIREBASE ──────────────────────────────────────────────
+var db = null;
+var FB_KEY = 'heywood-reed-tree';
+
+function initFirebase(config) {
+  try {
+    if (firebase.apps.length === 0) {
+      firebase.initializeApp(config);
+    }
+    db = firebase.database();
+    setSyncStatus('Connecting...', '');
+    // Test connection
+    db.ref('.info/connected').on('value', function(snap) {
+      if (snap.val() === true) {
+        setSyncStatus('Connected', 'ok');
+        loadFromFirebase();
+      } else {
+        setSyncStatus('Reconnecting...', '');
+      }
+    });
+    // Save config for future visits
+    try { localStorage.setItem('fbconfig', JSON.stringify(config)); } catch(e) {}
+    document.getElementById('firebase-setup-box').innerHTML = '';
+    return true;
+  } catch(e) {
+    setSyncStatus('Connection error', 'err');
+    return false;
+  }
+}
+
+function setSyncStatus(msg, cls) {
+  var el = document.getElementById('syncStatus');
+  el.textContent = msg;
+  el.className = 'sync-status' + (cls ? ' '+cls : '');
+}
+
+function loadFromFirebase() {
+  if (!db) return;
+  db.ref(FB_KEY).on('value', function(snap) {
+    var data = snap.val();
+    if (data) {
+      // Merge Firebase additions into GENS
+      if (data.additions) {
+        data.additions.forEach(function(add) {
+          applyAddition(add);
+        });
+      }
+      TD = data.tidbits || {};
+      GO = data.genOpen || {};
+    }
+    renderTree('');
+    renderStats();
+    renderAllStories();
+    setSyncStatus('Synced', 'ok');
+  }, function(err) {
+    setSyncStatus('Sync error', 'err');
+  });
+}
+
+function saveToFirebase() {
+  if (!db) {
+    // Fall back to localStorage
+    try { localStorage.setItem('hr_local', JSON.stringify({TD:TD, GO:GO, additions:ADDITIONS})); } catch(e) {}
+    return;
+  }
+  setSyncStatus('Saving...', '');
+  db.ref(FB_KEY).set({
+    tidbits: TD,
+    genOpen: GO,
+    additions: ADDITIONS,
+    lastUpdated: new Date().toISOString()
+  }, function(err) {
+    if (err) {
+      setSyncStatus('Save error', 'err');
+    } else {
+      setSyncStatus('Saved', 'ok');
+      setTimeout(function() { setSyncStatus('Connected', 'ok'); }, 2000);
+    }
+  });
+}
+
+function applyAddition(add) {
+  if (add.type === 'child') {
+    BASE_GENS.forEach(function(g) {
+      if (g.id === add.genId) {
+        g.families.forEach(function(f) {
+          f.marriages.forEach(function(m) {
+            if (m.id === add.marId) {
+              // Check not already added
+              var exists = (m.children||[]).some(function(c) { return c.id === add.item.id; });
+              if (!exists) {
+                add.item.num = (m.children||[]).length + 1;
+                m.children = m.children || [];
+                m.children.push(add.item);
+              }
+            }
+          });
+        });
+      }
+    });
+  } else if (add.type === 'marriage') {
+    BASE_GENS.forEach(function(g) {
+      if (g.id === add.genId) {
+        g.families.forEach(function(f) {
+          if (f.id === add.famId) {
+            var exists = f.marriages.some(function(m) { return m.id === add.item.id; });
+            if (!exists) { f.marriages.push(add.item); }
+          }
+        });
+      }
+    });
+  } else if (add.type === 'newfamily') {
+    BASE_GENS.forEach(function(g) {
+      if (g.id === add.genId) {
+        var exists = g.families.some(function(f) { return f.id === add.item.id; });
+        if (!exists) { g.families.push(add.item); }
+      }
+    });
+  }
+}
+
+// Show setup box if no Firebase config
+function showSetupBox() {
+  var saved = null;
+  try { saved = JSON.parse(localStorage.getItem('fbconfig')); } catch(e) {}
+  if (saved && saved.databaseURL) {
+    initFirebase(saved);
+    return;
+  }
+  document.getElementById('firebase-setup-box').innerHTML =
+    '<div class="setup-box">' +
+    '<h4>Connect to Shared Database</h4>' +
+    '<p>To share this tree with family members so everyone sees the same data, enter your Firebase Database URL below. See the Help tab for setup instructions.</p>' +
+    '<input type="text" id="fb-url-input" placeholder="https://your-project-default-rtdb.firebaseio.com"/>' +
+    '<button onclick="connectFirebase()">Connect</button>' +
+    '<p style="margin-top:8px;font-size:12px;color:#888">Without connecting, changes are saved on this device only.</p>' +
+    '</div>';
+  // Fall back to localStorage
+  try {
+    var local = JSON.parse(localStorage.getItem('hr_local') || '{}');
+    TD = local.TD || {};
+    GO = local.GO || {};
+    if (local.additions) { local.additions.forEach(function(a) { applyAddition(a); }); ADDITIONS = local.additions; }
+  } catch(e) {}
+}
+
+function connectFirebase() {
+  var url = document.getElementById('fb-url-input').value.trim();
+  if (!url) { alert('Please enter your Firebase Database URL.'); return; }
+  initFirebase({
+    apiKey: 'AIzaSyPlaceholder',
+    authDomain: 'placeholder.firebaseapp.com',
+    databaseURL: url,
+    projectId: 'placeholder',
+    storageBucket: 'placeholder.appspot.com',
+    messagingSenderId: '000000000000',
+    appId: '1:000000000000:web:placeholder'
+  });
+}
+
+// ── STATE ─────────────────────────────────────────────────
 var TD = {};
 var GO = {};
-try { var _s = JSON.parse(localStorage.getItem('hr2024') || '{}'); TD = _s.TD || {}; GO = _s.GO || {}; } catch(e) {}
-function save() { try { localStorage.setItem('hr2024', JSON.stringify({TD:TD,GO:GO})); } catch(e) {} }
+var ADDITIONS = [];
 
+// ── HELPERS ───────────────────────────────────────────────
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function uid() { return 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2,5); }
 function toast(m) { var t=document.getElementById('toast'); t.textContent=m; t.className='toast show'; setTimeout(function(){t.className='toast';},2500); }
@@ -297,13 +478,15 @@ function pillCls(r) {
   return 'pill pm';
 }
 
-// PASSWORD
+// ── PASSWORD ──────────────────────────────────────────────
 document.getElementById('pwbtn').addEventListener('click', function() {
   var v = document.getElementById('pwfield').value;
   if (v.toLowerCase() === 'heywood') {
     document.getElementById('lock').style.display = 'none';
     document.getElementById('app').style.display = 'block';
-    renderTree(''); renderStats();
+    showSetupBox();
+    renderTree('');
+    renderStats();
   } else {
     document.getElementById('pwerr').textContent = 'Incorrect password. Please try again.';
     document.getElementById('pwfield').value = '';
@@ -313,10 +496,10 @@ document.getElementById('pwfield').addEventListener('keydown', function(e) {
   if (e.key === 'Enter') { document.getElementById('pwbtn').click(); }
 });
 
-// STATS
+// ── STATS ─────────────────────────────────────────────────
 function renderStats() {
   var p=0,k=0,s=0;
-  GENS.forEach(function(g) { g.families.forEach(function(f) {
+  BASE_GENS.forEach(function(g) { g.families.forEach(function(f) {
     p++; if(f.primary.born&&f.primary.born!=='?') k++;
     s+=(TD[f.primary.id]||[]).length;
     f.marriages.forEach(function(m) {
@@ -327,13 +510,13 @@ function renderStats() {
   }); });
   var pct=p>0?Math.round(k/p*100):0;
   document.getElementById('statsrow').innerHTML =
-    '<div class="stat"><div class="stat-n">'+GENS.length+'</div><div class="stat-l">Generations</div></div>'+
+    '<div class="stat"><div class="stat-n">'+BASE_GENS.length+'</div><div class="stat-l">Generations</div></div>'+
     '<div class="stat"><div class="stat-n">'+p+'</div><div class="stat-l">People Recorded</div></div>'+
     '<div class="stat"><div class="stat-n">'+pct+'%</div><div class="stat-l">Dates Known</div></div>'+
     '<div class="stat"><div class="stat-n">'+s+'</div><div class="stat-l">Stories Shared</div></div>';
 }
 
-// TREE
+// ── TREE ──────────────────────────────────────────────────
 function makePill(p, showFamilyBtn) {
   var yr=(p.born&&p.born!=='?')?' <span class="pyr">b.'+esc(p.born)+'</span>':'';
   var dy=(p.died&&p.died!=='?')?' <span class="pyr">d.'+esc(p.died)+'</span>':'';
@@ -343,15 +526,14 @@ function makePill(p, showFamilyBtn) {
   var enc=btoa(unescape(encodeURIComponent(JSON.stringify(p))));
   var pill='<span class="'+pillCls(p.role)+'" data-enc="'+enc+'">'+esc(p.name)+star+yr+dy+'</span>'+badge;
   if(showFamilyBtn) {
-    var fenc=btoa(unescape(encodeURIComponent(JSON.stringify(p))));
-    pill+=' <button class="addbtn fambtn" data-action="startfamily" data-penc="'+fenc+'" title="Add spouse and children for '+esc(p.name)+'">+ family</button>';
+    pill+=' <button class="addbtn fambtn" data-action="startfamily" data-penc="'+enc+'" title="Add spouse and children for '+esc(p.name)+'">+ family</button>';
   }
   return pill;
 }
 
 function renderTree(filter) {
   var html='';
-  GENS.forEach(function(g) {
+  BASE_GENS.forEach(function(g) {
     var body=''; var match=!filter;
     g.families.forEach(function(fam) {
       var p=fam.primary;
@@ -372,7 +554,7 @@ function renderTree(filter) {
         body+='<div class="kids">';
         (m.children||[]).forEach(function(c) {
           if(filter&&c.name.toLowerCase().indexOf(filter)>=0) match=true;
-          body+='<div class="krow"><span class="knum">'+(c.num||'')+'. </span>'+makePill(c, true);
+          body+='<div class="krow"><span class="knum">'+(c.num||'')+'. </span>'+makePill(c,true);
           if(c.note) body+='<span class="knote">'+esc(c.note)+'</span>';
           body+='</div>';
         });
@@ -407,7 +589,7 @@ document.getElementById('treeroot').addEventListener('click', function(e) {
     var gid=ghdr.dataset.gid;
     var body=document.getElementById('body-'+gid);
     var arr=document.getElementById('arr-'+gid);
-    if(body&&arr) { var open=body.classList.toggle('open'); arr.classList.toggle('open',open); GO[gid]=open; save(); }
+    if(body&&arr) { var open=body.classList.toggle('open'); arr.classList.toggle('open',open); GO[gid]=open; saveToFirebase(); }
     return;
   }
   var btn=e.target.closest('.addbtn');
@@ -423,22 +605,22 @@ document.getElementById('treeroot').addEventListener('click', function(e) {
 });
 
 document.getElementById('expandbtn').addEventListener('click', function() {
-  GENS.forEach(function(g) { GO[g.id]=true; var b=document.getElementById('body-'+g.id),a=document.getElementById('arr-'+g.id); if(b)b.classList.add('open'); if(a)a.classList.add('open'); });
-  save();
+  BASE_GENS.forEach(function(g) { GO[g.id]=true; var b=document.getElementById('body-'+g.id),a=document.getElementById('arr-'+g.id); if(b)b.classList.add('open'); if(a)a.classList.add('open'); });
+  saveToFirebase();
 });
 document.getElementById('collapsebtn').addEventListener('click', function() {
-  GENS.forEach(function(g) { GO[g.id]=false; var b=document.getElementById('body-'+g.id),a=document.getElementById('arr-'+g.id); if(b)b.classList.remove('open'); if(a)a.classList.remove('open'); });
-  save();
+  BASE_GENS.forEach(function(g) { GO[g.id]=false; var b=document.getElementById('body-'+g.id),a=document.getElementById('arr-'+g.id); if(b)b.classList.remove('open'); if(a)a.classList.remove('open'); });
+  saveToFirebase();
 });
 document.getElementById('searchbox').addEventListener('input', function() { renderTree(this.value.toLowerCase().trim()); });
 
-// DRAWER
+// ── DRAWER ────────────────────────────────────────────────
 var curId=null;
 function openDrawer(p) {
   curId=p.id;
   document.getElementById('drpill').innerHTML='<span class="'+pillCls(p.role)+'" style="font-size:15px;padding:5px 12px">'+esc(p.name)+(p.role==='dir'?' &#9733;':'')+'</span>';
   document.getElementById('drname').textContent=p.name+(p.role==='dir'?' ★':'');
-  var rm={dir:'Direct ancestral line (John Heywood to David Reed)',sp:'Married into the family',m:'Male family member',f:'Female family member',dy:'Died young'};
+  var rm={dir:'Direct ancestral line',sp:'Married into the family',m:'Male family member',f:'Female family member',dy:'Died young'};
   document.getElementById('drrole').textContent=rm[p.role]||'Family member';
   var f='';
   if(p.born&&p.born!=='?') f+='<span class="dfl">Born</span><span class="dfv">'+esc(p.born)+(p.bp?' &nbsp;|&nbsp; '+esc(p.bp):'')+'</span>';
@@ -462,7 +644,7 @@ document.getElementById('stsavebtn').addEventListener('click', function() {
   if(!TD[curId])TD[curId]=[];
   TD[curId].push({text:txt,date:new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})});
   document.getElementById('stinput').value='';
-  save();renderDrStories();renderStats();
+  saveToFirebase();renderDrStories();renderStats();
   renderTree(document.getElementById('searchbox').value.toLowerCase().trim());
   renderAllStories();toast('Story saved!');
 });
@@ -470,18 +652,18 @@ document.getElementById('drstories').addEventListener('click', function(e) {
   var btn=e.target.closest('.stdel');
   if(btn&&confirm('Remove this story?')) {
     TD[curId].splice(parseInt(btn.dataset.i),1);
-    save();renderDrStories();renderStats();renderAllStories();
+    saveToFirebase();renderDrStories();renderStats();renderAllStories();
     renderTree(document.getElementById('searchbox').value.toLowerCase().trim());
   }
 });
 document.getElementById('drawclosebtn').addEventListener('click', function() { document.getElementById('drawoverlay').classList.remove('open'); curId=null; });
 document.getElementById('drawoverlay').addEventListener('click', function(e) { if(e.target===this) document.getElementById('drawclosebtn').click(); });
 
-// STORIES
+// ── STORIES ───────────────────────────────────────────────
 function renderAllStories() {
   function findName(id) {
     var n='Unknown';
-    GENS.forEach(function(g){g.families.forEach(function(f){
+    BASE_GENS.forEach(function(g){g.families.forEach(function(f){
       if(f.primary.id===id)n=f.primary.name;
       f.marriages.forEach(function(m){if(m.spouse.id===id)n=m.spouse.name;(m.children||[]).forEach(function(c){if(c.id===id)n=c.name;});});
     });});
@@ -494,7 +676,7 @@ function renderAllStories() {
   el.innerHTML=all.map(function(s){return '<div class="scard"><div class="swho">'+esc(s.name)+'</div><div class="stext">'+esc(s.text)+'</div><div class="smeta">Added '+esc(s.date)+'</div></div>';}).join('');
 }
 
-// TABS
+// ── TABS ──────────────────────────────────────────────────
 function showTab(name) {
   ['tree','stories','help'].forEach(function(t){
     var tb=document.getElementById('tab-'+t),pn=document.getElementById('pane-'+t);
@@ -507,7 +689,7 @@ document.getElementById('tab-tree').addEventListener('click',function(){showTab(
 document.getElementById('tab-stories').addEventListener('click',function(){showTab('stories');});
 document.getElementById('tab-help').addEventListener('click',function(){showTab('help');});
 
-// ADD MODAL
+// ── ADD MODAL ─────────────────────────────────────────────
 var addCtx=null;
 var chosenRole=null;
 
@@ -526,60 +708,30 @@ document.getElementById('addbtn').addEventListener('click', function() {
   openModal('Add a Family Member', {type:'general'}, true, true, '');
 });
 
-function openStartFamily(person) {
-  // Find which generation this person is in by searching children
-  var genNum = 0;
-  var genId = '';
-  GENS.forEach(function(g) {
-    g.families.forEach(function(f) {
-      f.marriages.forEach(function(m) {
-        (m.children||[]).forEach(function(c) {
-          if(c.id===person.id) { genNum=g.num; genId=g.id; }
-        });
-      });
-    });
-  });
-  // Check if this person already has their own family
-  var existingFam = null;
-  GENS.forEach(function(g) {
-    g.families.forEach(function(f) {
-      if(f.primary.id===person.id) existingFam=f;
-    });
-  });
-  if(existingFam) {
-    // Already has a family - open add marriage on it
-    var g2 = null;
-    GENS.forEach(function(g) { g.families.forEach(function(f) { if(f.id===existingFam.id) g2=g; }); });
-    if(g2) openAddMarriage(person.id, g2.id, existingFam.id);
-    return;
-  }
-  // Create a new family for this person in the SAME generation
-  // (they are a child in gen N, their own family also lives in gen N)
-  var targetGenId = genId;
-  var ctx = {type:'newfamily', person:person, genId:targetGenId};
-  clearForm();
-  addCtx = ctx;
-  document.getElementById('modaltitle').textContent = 'Add Spouse for ' + person.name;
-  document.getElementById('modal-info').textContent = 'This will create a new family entry for ' + person.name + '. Enter their spouse details below.';
-  document.getElementById('modal-info').style.display = 'block';
-  document.getElementById('marriage-fields').style.display = 'block';
-  document.getElementById('gen-field').style.display = 'none';
-  document.getElementById('parents-field').style.display = 'none';
-  // Pre-fill name hint
-  document.getElementById('f_name').placeholder = 'Spouse name e.g. Kelly';
-  document.getElementById('moverlay').classList.add('open');
-}
-
 function openAddChild(marId, genId) {
   var pn='';
-  GENS.forEach(function(g){if(g.id===genId){g.families.forEach(function(f){f.marriages.forEach(function(m){if(m.id===marId)pn=f.primary.name+' and '+m.spouse.name;});});}});
+  BASE_GENS.forEach(function(g){if(g.id===genId){g.families.forEach(function(f){f.marriages.forEach(function(m){if(m.id===marId)pn=f.primary.name+' and '+m.spouse.name;});});}});
   openModal('Add Child', {type:'child',marId:marId,genId:genId}, false, false, 'Adding child to: '+pn);
 }
 
 function openAddMarriage(pid, genId, famId) {
   var pn='';
-  GENS.forEach(function(g){if(g.id===genId){g.families.forEach(function(f){if(f.id===famId)pn=f.primary.name;});}});
+  BASE_GENS.forEach(function(g){if(g.id===genId){g.families.forEach(function(f){if(f.id===famId)pn=f.primary.name;});}});
   openModal('Add Spouse / New Marriage', {type:'marriage',pid:pid,genId:genId,famId:famId}, true, false, 'Adding new spouse or marriage for: '+pn);
+}
+
+function openStartFamily(person) {
+  var genId='';
+  BASE_GENS.forEach(function(g){g.families.forEach(function(f){f.marriages.forEach(function(m){(m.children||[]).forEach(function(c){if(c.id===person.id)genId=g.id;});});});});
+  var existingFam=null;
+  BASE_GENS.forEach(function(g){g.families.forEach(function(f){if(f.primary.id===person.id)existingFam=f;});});
+  if(existingFam) {
+    var g2=null;
+    BASE_GENS.forEach(function(g){g.families.forEach(function(f){if(f.id===existingFam.id)g2=g;});});
+    if(g2) openAddMarriage(person.id,g2.id,existingFam.id);
+    return;
+  }
+  openModal('Add Spouse for '+person.name, {type:'newfamily',person:person,genId:genId}, true, false, 'This will create a new family for '+person.name+'. Enter their spouse details below.');
 }
 
 function clearForm() {
@@ -616,54 +768,37 @@ document.getElementById('modalsavebtn').addEventListener('click', function() {
   if(!name){toast('Please enter a name.');return;}
   if(!chosenRole){toast('Please select Male, Female, Married in, or Died Young.');return;}
   var ctx=addCtx;
+  var addition = null;
 
   if(ctx.type==='child') {
     var child={id:uid(),name:name,born:document.getElementById('f_born').value.trim()||'?',bp:document.getElementById('f_bp').value.trim(),died:document.getElementById('f_died').value.trim(),dp:document.getElementById('f_dp').value.trim(),role:chosenRole,note:document.getElementById('f_notes').value.trim()};
-    GENS.forEach(function(g){if(g.id===ctx.genId){g.families.forEach(function(f){f.marriages.forEach(function(m){if(m.id===ctx.marId){child.num=(m.children||[]).length+1;m.children=m.children||[];m.children.push(child);}});});}});
+    addition = {type:'child', genId:ctx.genId, marId:ctx.marId, item:child};
+    applyAddition(addition);
     toast(name+' added!');
 
   } else if(ctx.type==='marriage') {
     var nm={id:uid(),label:'',married:document.getElementById('f_married').value.trim(),mplace:document.getElementById('f_mplace').value.trim(),divorced:document.getElementById('f_divorced').value.trim(),
       spouse:{id:uid(),name:name,born:document.getElementById('f_born').value.trim()||'?',bp:document.getElementById('f_bp').value.trim(),died:document.getElementById('f_died').value.trim(),dp:document.getElementById('f_dp').value.trim(),role:'sp'},children:[]};
-    GENS.forEach(function(g){if(g.id===ctx.genId){g.families.forEach(function(f){if(f.id===ctx.famId){var n=f.marriages.length+1;nm.label=n===2?'2nd spouse':n===3?'3rd spouse':n+'th spouse';f.marriages.push(nm);}});}});
+    BASE_GENS.forEach(function(g){if(g.id===ctx.genId){g.families.forEach(function(f){if(f.id===ctx.famId){var n=f.marriages.length+1;nm.label=n===2?'2nd spouse':n===3?'3rd spouse':n+'th spouse';}});}});
+    addition = {type:'marriage', genId:ctx.genId, famId:ctx.famId, item:nm};
+    applyAddition(addition);
     toast('New marriage added!');
 
   } else if(ctx.type==='newfamily') {
-    // Create a brand new family entry for ctx.person with the new spouse
-    var newFam = {
-      id: uid(),
-      primary: ctx.person,
-      marriages: [{
-        id: uid(),
-        label: 'wife/husband',
-        married: document.getElementById('f_married').value.trim(),
-        mplace: document.getElementById('f_mplace').value.trim(),
-        divorced: document.getElementById('f_divorced').value.trim(),
-        spouse: {
-          id: uid(),
-          name: name,
-          born: document.getElementById('f_born').value.trim()||'?',
-          bp: document.getElementById('f_bp').value.trim(),
-          died: document.getElementById('f_died').value.trim(),
-          dp: document.getElementById('f_dp').value.trim(),
-          role: 'sp'
-        },
-        children: []
-      }]
-    };
-    // Add to the same generation
-    GENS.forEach(function(g) {
-      if(g.id===ctx.genId) { g.families.push(newFam); }
-    });
-    toast('Family created for ' + ctx.person.name + '!');
+    var newFam={id:uid(),primary:ctx.person,marriages:[{id:uid(),label:'wife/husband',married:document.getElementById('f_married').value.trim(),mplace:document.getElementById('f_mplace').value.trim(),divorced:document.getElementById('f_divorced').value.trim(),spouse:{id:uid(),name:name,born:document.getElementById('f_born').value.trim()||'?',bp:document.getElementById('f_bp').value.trim(),died:document.getElementById('f_died').value.trim(),dp:document.getElementById('f_dp').value.trim(),role:'sp'},children:[]}]};
+    addition = {type:'newfamily', genId:ctx.genId, item:newFam};
+    applyAddition(addition);
+    toast('Family created for '+ctx.person.name+'!');
 
   } else {
     var person={id:uid(),name:name,born:document.getElementById('f_born').value.trim()||'?',bp:document.getElementById('f_bp').value.trim(),died:document.getElementById('f_died').value.trim(),dp:document.getElementById('f_dp').value.trim(),role:chosenRole,note:document.getElementById('f_notes').value.trim()};
     var gn=parseInt(document.getElementById('f_gen').value);
-    if(gn){GENS.forEach(function(g){if(g.num===gn&&g.families[0]&&g.families[0].marriages[0]){var m=g.families[0].marriages[0];person.num=(m.children||[]).length+1;m.children=m.children||[];m.children.push(person);}});}
+    if(gn){BASE_GENS.forEach(function(g){if(g.num===gn&&g.families[0]&&g.families[0].marriages[0]){var m=g.families[0].marriages[0];person.num=(m.children||[]).length+1;m.children=m.children||[];m.children.push(person);}});}
+    addition = {type:'general', item:person};
     toast(name+' added to the tree!');
   }
 
+  if(addition) { ADDITIONS.push(addition); saveToFirebase(); }
   document.getElementById('moverlay').classList.remove('open');
   addCtx=null; chosenRole=null;
   renderTree(document.getElementById('searchbox').value.toLowerCase().trim());
