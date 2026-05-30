@@ -228,6 +228,7 @@ body { font-family: Arial, sans-serif; background: #f5f5f0; color: #1c1a17; }
     </div>
     <div class="dbtns">
       <button class="dbtn" id="editpersonbtn" style="background:#1a3a5c;color:white;border-color:#1a3a5c">Edit details</button>
+      <button class="dbtn" id="deletepersonbtn" style="color:#a32d2d;border-color:#f09595">Delete person</button>
       <button class="dbtn" id="drawclosebtn">Close</button>
     </div>
   </div>
@@ -425,6 +426,20 @@ function applyAddition(add) {
     });
   } else if (add.type === 'edit') {
     applyEdit(add);
+  } else if (add.type === 'delete') {
+    BASE_GENS.forEach(function(g) {
+      g.families.forEach(function(f) {
+        f.marriages.forEach(function(m) {
+          m.children = (m.children||[]).filter(function(c) { return c.id !== add.personId; });
+          // Remove spouse marriage if spouse is deleted
+          m.children = m.children || [];
+        });
+        f.marriages = f.marriages.filter(function(m) { return m.spouse.id !== add.personId; });
+      });
+      g.families = g.families.filter(function(f) { return f.primary.id !== add.personId; });
+    });
+    // Remove their stories too
+    if (TD[add.personId]) { delete TD[add.personId]; }
   }
 }
 
@@ -792,6 +807,116 @@ document.getElementById('modalsavebtn').addEventListener('click', function() {
 
 document.getElementById('modalcancelbtn').addEventListener('click', function(){document.getElementById('moverlay').classList.remove('open');addCtx=null;chosenRole=null;});
 document.getElementById('moverlay').addEventListener('click', function(e){if(e.target===this)document.getElementById('modalcancelbtn').click();});
+
+// ── EDIT & DELETE ─────────────────────────────────────────
+var editingPerson = null;
+
+function findPersonById(id) {
+  var found = null;
+  BASE_GENS.forEach(function(g) {
+    g.families.forEach(function(f) {
+      if (f.primary.id === id) found = f.primary;
+      f.marriages.forEach(function(m) {
+        if (m.spouse.id === id) found = m.spouse;
+        (m.children||[]).forEach(function(c) { if (c.id === id) found = c; });
+      });
+    });
+  });
+  return found;
+}
+
+function applyEdit(editRecord) {
+  BASE_GENS.forEach(function(g) {
+    g.families.forEach(function(f) {
+      function updateP(p) {
+        if (p.id === editRecord.personId) {
+          var flds = editRecord.fields;
+          if (flds.name) p.name = flds.name;
+          if (flds.born !== undefined) p.born = flds.born || '?';
+          if (flds.bp !== undefined) p.bp = flds.bp;
+          if (flds.died !== undefined) p.died = flds.died;
+          if (flds.dp !== undefined) p.dp = flds.dp;
+          if (flds.note !== undefined) { p.note = flds.note; p.notes = flds.note; }
+        }
+      }
+      updateP(f.primary);
+      f.marriages.forEach(function(m) {
+        updateP(m.spouse);
+        (m.children||[]).forEach(function(c) { updateP(c); });
+      });
+    });
+  });
+}
+
+document.getElementById('editpersonbtn').addEventListener('click', function() {
+  if (!curId) return;
+  var found = findPersonById(curId);
+  if (!found) { toast('Could not find person - try closing and reopening their profile.'); return; }
+  editingPerson = found;
+  document.getElementById('e_name').value = found.name || '';
+  document.getElementById('e_born').value = (found.born === '?') ? '' : (found.born || '');
+  document.getElementById('e_bp').value = found.bp || '';
+  document.getElementById('e_died').value = found.died || '';
+  document.getElementById('e_dp').value = found.dp || '';
+  document.getElementById('e_notes').value = found.note || found.notes || '';
+  var ei = document.getElementById('edit-info');
+  ei.textContent = 'Editing: ' + found.name;
+  ei.style.display = 'block';
+  document.getElementById('editoverlay').classList.add('open');
+});
+
+document.getElementById('editsavebtn').addEventListener('click', function() {
+  if (!editingPerson) return;
+  var newName = document.getElementById('e_name').value.trim();
+  if (!newName) { toast('Name cannot be empty.'); return; }
+  var editRecord = {
+    type: 'edit',
+    personId: editingPerson.id,
+    fields: {
+      name: newName,
+      born: document.getElementById('e_born').value.trim(),
+      bp: document.getElementById('e_bp').value.trim(),
+      died: document.getElementById('e_died').value.trim(),
+      dp: document.getElementById('e_dp').value.trim(),
+      note: document.getElementById('e_notes').value.trim()
+    }
+  };
+  applyEdit(editRecord);
+  ADDITIONS.push(editRecord);
+  saveToFirebase();
+  document.getElementById('editoverlay').classList.remove('open');
+  editingPerson = null;
+  toast('Changes saved!');
+  renderTree(document.getElementById('searchbox').value.toLowerCase().trim());
+  renderStats();
+  setTimeout(function() {
+    var updated = findPersonById(curId);
+    if (updated) openDrawer(updated);
+  }, 100);
+});
+
+document.getElementById('editcancelbtn').addEventListener('click', function() {
+  document.getElementById('editoverlay').classList.remove('open');
+  editingPerson = null;
+});
+document.getElementById('editoverlay').addEventListener('click', function(e) {
+  if (e.target === this) document.getElementById('editcancelbtn').click();
+});
+
+document.getElementById('deletepersonbtn').addEventListener('click', function() {
+  if (!curId) return;
+  var person = findPersonById(curId);
+  if (!person) { toast('Person not found.'); return; }
+  if (!confirm('Delete ' + person.name + '? This cannot be undone.')) return;
+  // Record deletion
+  ADDITIONS.push({ type: 'delete', personId: curId });
+  saveToFirebase();
+  closeDrawer();
+  renderTree(document.getElementById('searchbox').value.toLowerCase().trim());
+  renderStats();
+  toast(person.name + ' has been removed.');
+});
+
 </script>
 
 <div class="moverlay" id="editoverlay">
